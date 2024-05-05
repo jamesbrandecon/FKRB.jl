@@ -59,7 +59,7 @@ end
 
 
 mutable struct FKRBGridDetails
-    ranges::Dict{String, StepRangeLen}
+    ranges::Dict{String, Any}
     method::String
 end
 
@@ -68,7 +68,7 @@ end
 Defines the FKRB problem, which is just a container for the data and results. 
 """
 function define_problem(; 
-    data=[], linear=[], nonlinear=[], iv=[], train=[],
+    data=[], linear=[], nonlinear=[], fixed_effects = [""], train=[],
     range = (-Inf, Inf), step = 0.1
     )
     # Any checks of the inputs
@@ -76,18 +76,23 @@ function define_problem(;
     try 
         @assert eltype(linear) <: AbstractString
         @assert eltype(nonlinear) <: AbstractString
-        @assert (eltype(iv) <: AbstractString) | (iv ==[])
     catch
-        throw(ArgumentError("linear, nonlinear, and iv must be vectors of strings"))
+        throw(ArgumentError("linear and nonlinear must be vectors of strings"))
+    end
+
+    # Check if prices is first -- of not, flag error
+    try 
+        @assert linear[1] == "prices"
+    catch
+        throw(ArgumentError("Prices must be the first variable in linear"))
     end
 
     # Are the variables in linear/nonlinear/iv all in data?
     try 
         @assert all([x ∈ names(data) for x ∈ linear])
         @assert all([x ∈ names(data) for x ∈ nonlinear])
-        @assert all([x ∈ names(data) for x ∈ iv])
     catch
-        throw(ArgumentError("linear, nonlinear, and iv must contain only variables present in data"))
+        throw(ArgumentError("linear and nonlinear must contain only variables present in data"))
     end
 
     # Do market_ids and product_ids exist? They should and they should uniquely identify rows 
@@ -99,21 +104,6 @@ function define_problem(;
         throw(ArgumentError("Data should have fields `market_ids` and `product_ids`, and these should uniquely identify rows"))
     end
 
-    if iv ==[]
-        try 
-            @assert (typeof(range) <: StepRangeLen) | (typeof(range) <: Dict)
-        catch
-            throw(ArgumentError("If `iv` is not provided, prices are assumed to be exogenous and custom ranges are required"))
-        end
-    end
-    if (iv !=[])
-        try 
-            @assert ((range==(-Inf, Inf)) | ("xi" in names(data)))
-        catch
-            throw(ArgumentError("If `iv` is provided, ranges will be calculated automatically using FRAC.jl"))
-        end
-    end
-
     # Defind grid details object 
     if range == (-Inf, Inf)
         println("Using FRAC.jl to generate intiial guess for grid points......");
@@ -122,9 +112,9 @@ function define_problem(;
             println("Demand instruments detected -- using IVs for prices in FRAC.jl......")
         end
         frac_problem = FRAC.define_problem(data = data, 
-            linear = ["prices", "x"], 
-            nonlinear = ["prices", "x"],
-            fixed_effects = ["market_ids"],
+            linear = linear, 
+            nonlinear = nonlinear,
+            fixed_effects = fixed_effects,
             se_type = "robust", 
             constrained = false);
 
@@ -165,7 +155,7 @@ function define_problem(;
 
     # Return the problem
     problem = FKRBProblem(sort(data, [:market_ids, :product_ids]), 
-            linear, nonlinear, iv, grid_points, [], train, [], [], [])
+            linear, nonlinear, [""], grid_points, [], train, [], [], [])
 
     return problem
 end
