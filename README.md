@@ -1,13 +1,13 @@
 # FKRB.jl
 
-This repo implements the method introduced by Fox, Kim, Ryan, and Bajari (2009) (FKRB) for estimating random coefficient mixed logit demand models. This approach allows us to estimate the distribution of consumer preferences nonparametrically and through a simple elastic net regression, thereby avoiding some of the convergence and speed issues with empirical estimation of random coefficient models. The package is barebones, but it allows you to do the following with just a few lines of code: 
+This repo implement a simple version of the method introduced by [Fox, Kim, Ryan, and Bajari (2009)](https://onlinelibrary.wiley.com/doi/abs/10.3982/QE49) (FKRB) for estimating random coefficient mixed logit demand models with market-level data. This approach allows us to estimate the distribution of consumer preferences nonparametrically and through a simple elastic net regression, thereby avoiding some of the convergence and speed issues with empirical estimation of random coefficient models. The code is bare bones for now, but it allows you to do the following with just a few lines of code: 
 
 - Estimate a random coefficient logit model 
 - Run a bootstrap to get standard errors on the resulting model estimates (i.e., estimated weights, conditional on the grid) 
-- Calculate price elasticities at existing prices (todo: allow for counterfactual prices)
+- Calculate price elasticities at existing prices (easy todo: allow for counterfactual prices)
 - Plot the (nonparametric) distribution of random coefficients
 
-Currently, I've only implemented the FKRB approach for market-level data. My goal is to have an API which is familiar and relatively consistent across [FRAC.jl](github.com/jamesbrandecon/FRAC.jl), [NPDemand.jl](github.com/jamesbrandecon/NPDemand.jl), and any other code I share for demand estimation, so that multiple packages can be tested quickly and eventually the packages can be merged together. 
+Currently, I've only implemented the FKRB approach for market-level data. My goal is to have an API which is familiar and relatively consistent across [FRAC.jl](github.com/jamesbrandecon/FRAC.jl), [NPDemand.jl](github.com/jamesbrandecon/NPDemand.jl), and any other code I share for demand estimation, so that multiple packages can be tested quickly and eventually the packages can be merged together. PRs welcome -- without them, updates will be very slow.  
 
 ## Installation 
 Install from Github: 
