@@ -7,8 +7,8 @@ function sim_logit_vary_J(J1, J2, T, B, beta, sd, v; with_market_FEs = false)
         df = reshape_pyblp(toDataFrame(s,p,z,x,xi,marketFE));
         df2 = reshape_pyblp(toDataFrame(s2,p2,z2,x2,xi2,marketFE2));
     else
-        s,p,z,x, xi = simulate_logit(J1,T,beta, sd, 0.3);
-        s2,p2,z2,x2, xi2 = simulate_logit(J2,T,beta, sd, 0.3);
+        s,p,z,x, xi = simulate_logit(J1,T,beta, sd, v);
+        s2,p2,z2,x2, xi2 = simulate_logit(J2,T,beta, sd, v);
 
         # Reshape data into desired DataFrame, add necessary IVs
         df = reshape_pyblp(toDataFrame(s,p,z,x,xi));
@@ -17,6 +17,7 @@ function sim_logit_vary_J(J1, J2, T, B, beta, sd, v; with_market_FEs = false)
 
     df2[!,"product_ids"] = df2.product_ids .+ 2;
     df2[!,"market_ids"] = df2.market_ids .+ T .+1;
+    
     df = [df;df2]
     df[!,"by_example"] = mod.(1:size(df,1),B); # Generate variable indicating separate geographies
     df[!,"demand_instruments1"] = df.demand_instruments0.^2;
@@ -104,8 +105,10 @@ function reshape_pyblp(df::DataFrame; random_constant = false)
     market_ids = df[!, "market_ids"];
     market_ids = repeat(market_ids, size(shares,2));
     
-    market_FEs = df[!, "market_FEs"];
-    market_FEs = repeat(market_FEs, size(shares,2));
+    if "market_FEs" in names(df)
+        market_FEs = df[!, "market_FEs"];
+        market_FEs = repeat(market_FEs, size(shares,2));
+    end
 
     product_ids = repeat((1:size(shares,2))', size(df,1),1);
     product_ids = dropdims(reshape(product_ids, size(df,1)*size(shares,2),1), dims=2);
@@ -141,6 +144,8 @@ function reshape_pyblp(df::DataFrame; random_constant = false)
         new_df[!,"demand_instruments1"] = demand_instruments1;
     end
     new_df[!,"market_ids"] = market_ids;
-    new_df[!,"market_FEs"] = market_FEs;
+    if "market_FEs" in names(df)
+        new_df[!,"market_FEs"] = market_FEs;
+    end
     return new_df
 end

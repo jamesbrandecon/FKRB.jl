@@ -12,7 +12,9 @@ Currently, I've only implemented the FKRB approach for market-level data. My goa
 ## Installation 
 Install from Github: 
 ```julia
-using Pkg; Pkg.add(url = "https://github.com/jamesbrandecon/FKRB.jl")
+using Pkg; 
+Pkg.add(url = "https://github.com/jamesbrandecon/FRAC.jl") # FRAC has to be installed first
+Pkg.add(url = "https://github.com/jamesbrandecon/FKRB.jl")
 ```
 
 ## Usage 

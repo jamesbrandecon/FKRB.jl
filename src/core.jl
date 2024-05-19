@@ -69,7 +69,7 @@ Defines the FKRB problem, which is just a container for the data and results.
 """
 function define_problem(; 
     data=[], linear=[], nonlinear=[], fixed_effects = [""], train=[],
-    range = (-Inf, Inf), step = 0.1
+    range = (-Inf, Inf), step = 0.1, alpha = 0.0001
     )
     # Any checks of the inputs
     # Are linear/nonlinear/iv all vectors of strings
@@ -115,19 +115,19 @@ function define_problem(;
             linear = linear, 
             nonlinear = nonlinear,
             fixed_effects = fixed_effects,
-            se_type = "robust", 
+            se_type = "bootstrap", 
             constrained = false);
 
         FRAC.estimate!(frac_problem)
 
         data = frac_problem.data;
+        data[!,"xi"] = data.xi .+ data.estimatedFE_market_ids;
 
         range_dict = Dict()
         betas = coef(frac_problem.raw_results_internal)
         betanames = coefnames(frac_problem.raw_results_internal)
-        alpha = 0.0001
         multiplier = quantile(Normal(0,1), 1-alpha/2);
-        for nl in ["x", "prices"]
+        for nl in nonlinear
             ind_mean = findall(betanames .== nl);
             ind_sd = findall(betanames .== string("K_", nl));
             beta_mean = betas[ind_mean][1];
