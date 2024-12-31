@@ -1,21 +1,21 @@
 function sim_logit_vary_J(J1, J2, T, B, beta, sd, v; with_market_FEs = false)
     if with_market_FEs
-        s,p,z,x,xi,marketFE = simulate_logit(J1,T,beta, sd, v, with_market_FEs = with_market_FEs);
-        s2,p2,z2,x2,xi2,marketFE2 = simulate_logit(J2,T,beta, sd, v, with_market_FEs = with_market_FEs);
+        s,p,z,x,xi,marketFE,own_elast = simulate_logit(J1,T,beta, sd, v, with_market_FEs = with_market_FEs);
+        s2,p2,z2,x2,xi2,marketFE2,own_elast2 = simulate_logit(J2,T,beta, sd, v, with_market_FEs = with_market_FEs);
         
         # Reshape data into desired DataFrame, add necessary IVs
-        df = reshape_pyblp(toDataFrame(s,p,z,x,xi,marketFE));
-        df2 = reshape_pyblp(toDataFrame(s2,p2,z2,x2,xi2,marketFE2));
+        df = reshape_pyblp(toDataFrame(s,p,z,x,xi; marketFE = marketFE,own_elast = own_elast));
+        df2 = reshape_pyblp(toDataFrame(s2,p2,z2,x2,xi2,marketFE = marketFE2,own_elast = own_elast2));
     else
-        s,p,z,x, xi = simulate_logit(J1,T,beta, sd, v);
-        s2,p2,z2,x2, xi2 = simulate_logit(J2,T,beta, sd, v);
+        s,p,z,x, xi, own_elast = simulate_logit(J1,T,beta, sd, v);
+        s2,p2,z2,x2, xi2,own_elast2 = simulate_logit(J2,T,beta, sd, v);
 
         # Reshape data into desired DataFrame, add necessary IVs
-        df = reshape_pyblp(toDataFrame(s,p,z,x,xi));
-        df2 = reshape_pyblp(toDataFrame(s2,p2,z2,x2, xi2));
+        df = reshape_pyblp(toDataFrame(s,p,z,x,xi,marketFE = zeros(size(s,1)), own_elast = own_elast));
+        df2 = reshape_pyblp(toDataFrame(s2,p2,z2,x2,xi2,marketFE = zeros(size(s,1)), own_elast = own_elast2));
     end
 
-    df2[!,"product_ids"] = df2.product_ids .+ 2;
+    df2[!,"product_ids"] = df2.product_ids .+ maximum(df.product_ids);
     df2[!,"market_ids"] = df2.market_ids .+ T .+1;
     
     df = [df;df2]
@@ -28,7 +28,28 @@ function sim_logit_vary_J(J1, J2, T, B, beta, sd, v; with_market_FEs = false)
 
     return df
 end
+function toDataFrame(s::Matrix, p::Matrix, z::Matrix, 
+    x::Matrix = zeros(size(s)), xi::Matrix = zeros(size(s));
+    own_elast = zeros(size(s)),
+    marketFE = zeros(size(s,1)))
+    df = DataFrame();
+    J = size(s,2);
 
+    for j = 0:J-1
+        df[!, "shares$j"] =  s[:,j+1];
+        df[!, "prices$j"] =  p[:,j+1];
+        df[!, "demand_instruments$j"] =  z[:,j+1];
+        df[!, "x$j"] =  x[:,j+1];
+        df[!, "xi$j"] =  xi[:,j+1];
+        df[!, "own_elast$j"] =  own_elast[:,j+1];
+    end
+    
+    if maximum(marketFE) > 0
+        df[!,"market_FEs"] .= marketFE;
+    end
+    @show names(df)
+    return df;
+end
 function simulate_logit(J,T, beta, sd, v; with_market_FEs = false)
     # --------------------------------------------------%
     # Simulate mixed logit with outside option
@@ -50,6 +71,7 @@ function simulate_logit(J,T, beta, sd, v; with_market_FEs = false)
     
         # Loop over markets
         s = zeros(T,J);
+        own_elast = zeros(T,J);
         market_FEs = zeros(T);
         
         for t = 1:1:T
@@ -68,36 +90,25 @@ function simulate_logit(J,T, beta, sd, v; with_market_FEs = false)
             beta_i = beta_i .+ beta;
             denominator = ones(I,1);
             for j = 1:1:J
-                denominator = denominator .+ exp.(beta_i[:,1].*pt[t,j] + beta_i[:,2].*xt[t,j] .+ market_FE .+ xit[t,j]);
+                delta_jt = beta_i[:,1].*pt[t,j] + beta_i[:,2].*xt[t,j] .+ market_FE .+ xit[t,j];
+                denominator = denominator .+ exp.(delta_jt);
             end
             for j = 1:1:J
-                s[t,j] = mean(exp.(beta_i[:,1].* pt[t,j] + beta_i[:,2].*xt[t,j] .+ market_FE .+ xit[t,j])./denominator);
+                delta_jt = beta_i[:,1].* pt[t,j] 
+                    + beta_i[:,2].*xt[t,j] .+ 
+                    market_FE .+ 
+                    xit[t,j];
+                s_ijt = exp.(delta_jt) ./ denominator;
+                s[t,j] = mean(s_ijt);
+                own_elast[t,j] = mean(s_ijt .* (1 .- s_ijt) .* beta_i[:,1]) * pt[t,j] ./ s[t,j];
             end
         end
         if with_market_FEs == true
-            return s, pt, zt, xt, xit, market_FEs
+            return s, pt, zt, xt, xit, market_FEs, own_elast
         else
-            return s, pt, zt, xt, xit
+            return s, pt, zt, xt, xit, own_elast
         end
 end
-
-function toDataFrame(s::Matrix, p::Matrix, z::Matrix, x::Matrix = zeros(size(s)), xi::Matrix = zeros(size(s)), marketFE = zeros(size(s,1)))
-    df = DataFrame();
-    J = size(s,2);
-    for j = 0:J-1
-        df[!, "shares$j"] =  s[:,j+1];
-        df[!, "prices$j"] =  p[:,j+1];
-        df[!, "demand_instruments$j"] =  z[:,j+1];
-        df[!, "x$j"] =  x[:,j+1];
-        df[!, "xi$j"] =  xi[:,j+1];
-    end
-    
-    if marketFE != zeros(size(s,1))
-        df[!,"market_FEs"] .= marketFE;
-    end
-    return df;
-end
-
 function reshape_pyblp(df::DataFrame; random_constant = false)
     df.market_ids = 1:size(df,1);
     shares = Matrix(df[!,r"shares"]);
@@ -124,6 +135,9 @@ function reshape_pyblp(df::DataFrame; random_constant = false)
     xs = Matrix(df[!,r"x\d"]);
     xs = dropdims(reshape(xs, size(df,1)*size(xs,2),1), dims=2);
 
+    own_elasts = Matrix(df[!,r"own_elast"]);
+    own_elasts = dropdims(reshape(own_elasts, size(df,1)*size(own_elasts,2),1), dims=2);
+
     demand_instruments0 = Matrix(df[!,r"demand_instruments"]);
 
     if random_constant ==true
@@ -138,6 +152,7 @@ function reshape_pyblp(df::DataFrame; random_constant = false)
     new_df[!,"product_ids"] = product_ids;
     new_df[!,"x"] = xs;
     new_df[!,"xi"] = xis;
+    new_df[!,"own_elast"] = own_elasts;
 
     new_df[!,"demand_instruments0"] = demand_instruments0;
     if random_constant ==true
