@@ -121,7 +121,11 @@ function define_problem(;
         FRAC.estimate!(frac_problem)
 
         data = frac_problem.data;
-        data[!,"xi"] = data.xi .+ data.estimatedFE_market_ids;
+        for x in fixed_effects
+            # purposeful misnomer -- xi doesn't have to be a residual here, 
+            # because it's tucked into the share equations
+            data[!,"xi"] += data[!,"estimatedFE_$x"]; 
+        end
 
         range_dict = Dict()
         betas = coef(frac_problem.raw_results_internal)
