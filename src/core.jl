@@ -136,7 +136,7 @@ function define_problem(;
             ind_sd = findall(betanames .== string("K_", nl));
             beta_mean = betas[ind_mean][1];
             beta_sd = abs(betas[ind_sd][1])
-            nl_range = Base.range(beta_mean .- multiplier * sqrt(beta_sd), beta_mean .+ multiplier * sqrt(beta_sd), step = 0.1)
+            nl_range = Base.range(beta_mean .- multiplier * sqrt(beta_sd), beta_mean .+ multiplier * sqrt(beta_sd), step = step)
             push!(range_dict, nl => nl_range)
         end
     else
